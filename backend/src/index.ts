@@ -18,8 +18,9 @@ const API_VERSION = process.env.API_VERSION || 'v1';
 
 // Middleware
 app.use(helmet()); // Security headers
+const allowedOrigin = process.env.FRONTEND_URL;
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+  origin: allowedOrigin === '*' || !allowedOrigin ? true : allowedOrigin,
   credentials: true
 }));
 app.use(express.json()); // Parse JSON bodies
