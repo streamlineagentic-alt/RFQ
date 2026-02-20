@@ -1,0 +1,445 @@
+// This is your Prisma schema file
+// Learn more: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// User model (buyers, suppliers, admins)
+model User {
+  id            Int       @id @default(autoincrement())
+  email         String    @unique
+  passwordHash  String    @map("password_hash")
+  role          String    // 'buyer', 'supplier', 'admin'
+  firstName     String?   @map("first_name")
+  lastName      String?   @map("last_name")
+  companyName   String?   @map("company_name")
+  phone         String?
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+  lastLogin     DateTime? @map("last_login")
+  isActive      Boolean   @default(true) @map("is_active")
+  emailVerified Boolean   @default(false) @map("email_verified")
+
+  // Relations
+  rfqs          Rfq[]
+  supplier      Supplier?
+  auditLogs     AuditLog[]
+  notifications Notification[]
+
+  @@index([email])
+  @@index([role])
+  @@map("users")
+}
+
+// Category model
+model Category {
+  id              Int      @id @default(autoincrement())
+  name            String
+  slug            String   @unique
+  parentId        Int?     @map("parent_id")
+  description     String?
+  isHighVelocity  Boolean  @default(false) @map("is_high_velocity")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  parent              Category?          @relation("CategoryHierarchy", fields: [parentId], references: [id])
+  children            Category[]         @relation("CategoryHierarchy")
+  rfqs                Rfq[]
+  supplierCategories  SupplierCategory[]
+  inventoryItems      InventoryItem[]
+
+  @@index([slug])
+  @@index([parentId])
+  @@map("categories")
+}
+
+// Supplier model
+model Supplier {
+  id                      Int      @id @default(autoincrement())
+  userId                  Int      @unique @map("user_id")
+  companyName             String   @map("company_name")
+  supplierType            String?  @map("supplier_type") // 'OEM', 'Distributor', 'Reseller'
+  description             String?
+  website                 String?
+  contactName             String?  @map("contact_name")
+  contactEmail            String?  @map("contact_email")
+  contactPhone            String?  @map("contact_phone")
+  country                 String?
+  city                    String?
+  address                 String?
+  regionsServed           Json?    @map("regions_served")
+  canExportToUkraine      Boolean  @default(false) @map("can_export_to_ukraine")
+  certifications          Json?
+  responsivenessScore     Int      @default(3) @map("responsiveness_score")
+  averageResponseTimeHours Int?    @map("average_response_time_hours")
+  totalRfqsReceived       Int      @default(0) @map("total_rfqs_received")
+  totalQuotesSubmitted    Int      @default(0) @map("total_quotes_submitted")
+  quoteSubmissionRate     Decimal? @map("quote_submission_rate") @db.Decimal(5, 2)
+  createdAt               DateTime @default(now()) @map("created_at")
+  updatedAt               DateTime @updatedAt @map("updated_at")
+  isActive                Boolean  @default(true) @map("is_active")
+
+  // Relations
+  user               User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  categories         SupplierCategory[]
+  rfqSuppliers       RfqSupplier[]
+  quotes             Quote[]
+
+  @@index([userId])
+  @@index([supplierType])
+  @@index([country])
+  @@index([isActive])
+  @@map("suppliers")
+}
+
+// Supplier-Category junction table
+model SupplierCategory {
+  id         Int      @id @default(autoincrement())
+  supplierId Int      @map("supplier_id")
+  categoryId Int      @map("category_id")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  // Relations
+  supplier Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  category Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@unique([supplierId, categoryId])
+  @@index([supplierId])
+  @@index([categoryId])
+  @@map("supplier_categories")
+}
+
+// RFQ model
+model Rfq {
+  id                    Int       @id @default(autoincrement())
+  buyerId               Int       @map("buyer_id")
+  rfqNumber             String    @unique @map("rfq_number")
+  projectName           String    @map("project_name")
+  status                String    @default("draft") // 'draft', 'open', 'closed', 'awarded', 'cancelled'
+  categoryId            Int?      @map("category_id")
+  industry              String?
+  deliveryCountry       String    @map("delivery_country")
+  deliveryCity          String?   @map("delivery_city")
+  deliveryAddress       String?   @map("delivery_address")
+  deliveryWindowStart   DateTime? @map("delivery_window_start")
+  deliveryWindowEnd     DateTime? @map("delivery_window_end")
+  description           String
+  specifications        String?
+  quantity              Decimal?  @db.Decimal(10, 2)
+  quantityUom           String?   @map("quantity_uom")
+  metadata              Json?
+  normalizedData        Json?     @map("normalized_data")
+  isNormalized          Boolean   @default(false) @map("is_normalized")
+  normalizationFlags    Json?     @map("normalization_flags")
+  originalFilePath      String?   @map("original_file_path")
+  originalFileName      String?   @map("original_file_name")
+  originalFileType      String?   @map("original_file_type")
+  createdAt             DateTime  @default(now()) @map("created_at")
+  updatedAt             DateTime  @updatedAt @map("updated_at")
+  publishedAt           DateTime? @map("published_at")
+  closedAt              DateTime? @map("closed_at")
+  responseDeadline      DateTime? @map("response_deadline")
+  buyerNotes            String?   @map("buyer_notes")
+
+  // Relations
+  buyer            User             @relation(fields: [buyerId], references: [id], onDelete: Cascade)
+  category         Category?        @relation(fields: [categoryId], references: [id])
+  rfqSuppliers     RfqSupplier[]
+  quotes           Quote[]
+  recommendations  Recommendation[]
+
+  @@index([buyerId])
+  @@index([rfqNumber])
+  @@index([status])
+  @@index([categoryId])
+  @@index([deliveryCountry])
+  @@index([createdAt(sort: Desc)])
+  @@map("rfqs")
+}
+
+// RFQ-Supplier assignment
+model RfqSupplier {
+  id                 Int       @id @default(autoincrement())
+  rfqId              Int       @map("rfq_id")
+  supplierId         Int       @map("supplier_id")
+  status             String    @default("assigned") // 'assigned', 'acknowledged', 'quoting', 'submitted', 'declined'
+  matchScore         Int?      @map("match_score")
+  matchReasons       Json?     @map("match_reasons")
+  assignedAt         DateTime  @default(now()) @map("assigned_at")
+  acknowledgedAt     DateTime? @map("acknowledged_at")
+  quotingStartedAt   DateTime? @map("quoting_started_at")
+  submittedAt        DateTime? @map("submitted_at")
+  declinedAt         DateTime? @map("declined_at")
+  lastReminderSent   DateTime? @map("last_reminder_sent")
+  reminderCount      Int       @default(0) @map("reminder_count")
+  supplierNotes      String?   @map("supplier_notes")
+  buyerNotes         String?   @map("buyer_notes")
+
+  // Relations
+  rfq      Rfq      @relation(fields: [rfqId], references: [id], onDelete: Cascade)
+  supplier Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  quotes   Quote[]
+
+  @@unique([rfqId, supplierId])
+  @@index([rfqId])
+  @@index([supplierId])
+  @@index([status])
+  @@map("rfq_suppliers")
+}
+
+// Quote model
+model Quote {
+  id                  Int       @id @default(autoincrement())
+  rfqSupplierId       Int       @map("rfq_supplier_id")
+  rfqId               Int       @map("rfq_id")
+  supplierId          Int       @map("supplier_id")
+  price               Decimal   @db.Decimal(12, 2)
+  currency            String    @default("USD")
+  leadTimeWeeks       Int?      @map("lead_time_weeks")
+  shipDate            DateTime? @map("ship_date")
+  incoterm            String?
+  paymentTerms        String?   @map("payment_terms")
+  scopeDescription    String?   @map("scope_description")
+  inclusions          String?
+  exclusions          String?
+  warrantyMonths      Int?      @map("warranty_months")
+  warrantyDescription String?   @map("warranty_description")
+  validUntil          DateTime  @map("valid_until")
+  notes               String?
+  metadata            Json?
+  attachmentPath      String?   @map("attachment_path")
+  attachmentName      String?   @map("attachment_name")
+  status              String    @default("submitted") // 'submitted', 'withdrawn', 'awarded', 'rejected'
+  isEditedByBuyer     Boolean   @default(false) @map("is_edited_by_buyer")
+  createdAt           DateTime  @default(now()) @map("created_at")
+  updatedAt           DateTime  @updatedAt @map("updated_at")
+  submittedAt         DateTime  @default(now()) @map("submitted_at")
+
+  // Relations
+  rfqSupplier RfqSupplier @relation(fields: [rfqSupplierId], references: [id], onDelete: Cascade)
+  rfq         Rfq         @relation(fields: [rfqId], references: [id], onDelete: Cascade)
+  supplier    Supplier    @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+
+  @@index([rfqId])
+  @@index([supplierId])
+  @@index([rfqSupplierId])
+  @@index([price])
+  @@index([shipDate])
+  @@index([status])
+  @@map("quotes")
+}
+
+// Vendor model (for inventory)
+model Vendor {
+  id             Int       @id @default(autoincrement())
+  name           String
+  vendorCode     String?   @unique @map("vendor_code")
+  contactName    String?   @map("contact_name")
+  contactEmail   String?   @map("contact_email")
+  contactPhone   String?   @map("contact_phone")
+  apiEndpoint    String?   @map("api_endpoint")
+  apiKeyHash     String?   @map("api_key_hash")
+  feedType       String?   @map("feed_type") // 'api', 'scheduled_file', 'manual'
+  feedSchedule   String?   @map("feed_schedule")
+  lastSyncAt     DateTime? @map("last_sync_at")
+  totalItems     Int       @default(0) @map("total_items")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+  isActive       Boolean   @default(true) @map("is_active")
+
+  // Relations
+  inventoryItems InventoryItem[]
+
+  @@index([vendorCode])
+  @@index([isActive])
+  @@map("vendors")
+}
+
+// Inventory Item model (R2D)
+model InventoryItem {
+  id                   Int       @id @default(autoincrement())
+  vendorId             Int       @map("vendor_id")
+  vendorSku            String    @map("vendor_sku")
+  oem                  String?
+  mpn                  String?
+  model                String?
+  categoryId           Int?      @map("category_id")
+  description          String
+  qtyAvailable         Decimal   @map("qty_available") @db.Decimal(10, 2)
+  qtyUom               String    @default("units") @map("qty_uom")
+  status               String    @default("available") // 'available', 'reserved', 'sold', 'unknown'
+  shipFromLocation     String?   @map("ship_from_location")
+  shipFromCountry      String?   @map("ship_from_country")
+  earliestShipDate     DateTime  @map("earliest_ship_date")
+  r2dTier              Int?      @map("r2d_tier") // 0, 1, 2
+  businessDaysToShip   Int?      @map("business_days_to_ship")
+  condition            String    @default("new") // 'new', 'surplus_new', 'refurbished', 'used'
+  lastVerified         DateTime  @map("last_verified")
+  verificationMethod   String    @map("verification_method") // 'api_feed', 'scheduled_file', 'manual', 'stale'
+  confidenceScore      Decimal?  @map("confidence_score") @db.Decimal(3, 2)
+  price                Decimal?  @db.Decimal(12, 2)
+  currency             String?
+  metadata             Json?
+  createdAt            DateTime  @default(now()) @map("created_at")
+  updatedAt            DateTime  @updatedAt @map("updated_at")
+  expiresAt            DateTime? @map("expires_at")
+  isExpired            Boolean   @default(false) @map("is_expired")
+
+  // Relations
+  vendor       Vendor             @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  category     Category?          @relation(fields: [categoryId], references: [id])
+  oilGasSpec   OilGasProductSpec?
+
+  @@unique([vendorId, vendorSku])
+  @@index([vendorId])
+  @@index([categoryId])
+  @@index([r2dTier])
+  @@index([earliestShipDate])
+  @@index([status])
+  @@index([isExpired])
+  @@index([mpn])
+  @@index([confidenceScore])
+  @@map("inventory_items")
+}
+
+// Oil & Gas Product Specification (linked 1-to-1 with InventoryItem)
+model OilGasProductSpec {
+  id                   Int       @id @default(autoincrement())
+  inventoryItemId      Int       @unique @map("inventory_item_id")
+
+  // Sector & classification
+  sector               String    // 'upstream', 'midstream', 'downstream', 'consumer'
+  productFamily        String?   @map("product_family")
+  // e.g. 'Wellhead & Christmas Tree', 'Drilling Equipment', 'Pipeline Fittings',
+  //      'Valves', 'Pressure Vessels', 'Pumps & Compressors', 'Instrumentation',
+  //      'Safety & PPE', 'Chemicals', 'Lifting & Rigging'
+
+  // Standards & specs
+  apiStandard          String?   @map("api_standard")   // e.g. 'API 5L', 'API 6A', 'API 6D'
+  astmStandard         String?   @map("astm_standard")  // e.g. 'ASTM A105', 'ASTM A335'
+  otherStandard        String?   @map("other_standard")
+
+  // Pressure & temperature ratings
+  pressureRatingPsi    Int?      @map("pressure_rating_psi")
+  pressureClassAnsi    String?   @map("pressure_class_ansi")  // e.g. '150#', '300#', '600#', '900#', '1500#', '2500#'
+  temperatureRatingMinC Int?     @map("temperature_rating_min_c")
+  temperatureRatingMaxC Int?     @map("temperature_rating_max_c")
+
+  // Material & dimensions
+  materialGrade        String?   @map("material_grade")   // e.g. 'API 5L X65', 'AISI 4130', 'SS316L'
+  sizeNps              Decimal?  @map("size_nps") @db.Decimal(6, 3)      // nominal pipe size in inches
+  sizeMm               Decimal?  @map("size_mm")  @db.Decimal(8, 2)      // outer diameter in mm
+  wallThicknessIn      Decimal?  @map("wall_thickness_in") @db.Decimal(6, 4)
+  endConnection        String?   @map("end_connection")   // 'Flanged', 'Threaded', 'BW', 'SW', 'Hub'
+  boreConfiguration    String?   @map("bore_configuration") // 'Full Bore', 'Reduced Bore'
+  actuatorType         String?   @map("actuator_type")   // 'Manual', 'Pneumatic', 'Electric', 'Hydraulic'
+
+  // Service / fluid
+  fluidService         String?   @map("fluid_service")   // 'Oil', 'Gas', 'Water', 'Multiphase', 'H2S', 'Chemicals'
+  isH2sService         Boolean   @default(false) @map("is_h2s_service")
+  naceCompliant        Boolean   @default(false) @map("nace_compliant")   // NACE MR0175 / ISO 15156
+  maxH2sPartialPressure Decimal? @map("max_h2s_partial_pressure") @db.Decimal(8, 4) // kPa
+
+  // Hazardous area / safety
+  exRating             String?   @map("ex_rating")       // 'ATEX Zone 1', 'ATEX Zone 2', 'IECEx', 'NEC Class I Div 1'
+  hazardClass          String?   @map("hazard_class")    // for chemicals / dangerous goods
+  unNumber             String?   @map("un_number")       // e.g. 'UN1863'
+
+  // Compliance & certifications
+  certifications       Json?                             // ["API 6A", "CE", "PED", "ATEX", "DNV"]
+  countryOfOrigin      String?   @map("country_of_origin")
+  hsCode               String?   @map("hs_code")         // HS tariff code e.g. '8481.80.39'
+  exportControlled     Boolean   @default(false) @map("export_controlled")
+  eccnCode             String?   @map("eccn_code")       // US Export Control Classification Number
+
+  // Commercial
+  minOrderQty          Decimal?  @map("min_order_qty") @db.Decimal(10, 2)
+  leadTimeDays         Int?      @map("lead_time_days")
+  incoterms            String?                           // 'EXW', 'FCA', 'CIF', 'DAP', 'DDP'
+  manufacturerName     String?   @map("manufacturer_name")
+
+  createdAt            DateTime  @default(now()) @map("created_at")
+  updatedAt            DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  inventoryItem InventoryItem @relation(fields: [inventoryItemId], references: [id], onDelete: Cascade)
+
+  @@index([sector])
+  @@index([productFamily])
+  @@index([isH2sService])
+  @@index([naceCompliant])
+  @@index([apiStandard])
+  @@index([sizeNps])
+  @@map("oil_gas_product_specs")
+}
+
+// Recommendation model
+model Recommendation {
+  id                 Int      @id @default(autoincrement())
+  rfqId              Int      @map("rfq_id")
+  recommendedQuotes  Json     @map("recommended_quotes")
+  algorithmVersion   String   @default("rule_based_v1") @map("algorithm_version")
+  buyerNotes         String?  @map("buyer_notes")
+  isReviewed         Boolean  @default(false) @map("is_reviewed")
+  reviewedAt         DateTime? @map("reviewed_at")
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  rfq Rfq @relation(fields: [rfqId], references: [id], onDelete: Cascade)
+
+  @@index([rfqId])
+  @@map("recommendations")
+}
+
+// Audit Log model
+model AuditLog {
+  id         Int      @id @default(autoincrement())
+  userId     Int?     @map("user_id")
+  entityType String   @map("entity_type")
+  entityId   Int      @map("entity_id")
+  action     String   // 'create', 'update', 'delete', 'status_change'
+  oldValues  Json?    @map("old_values")
+  newValues  Json?    @map("new_values")
+  ipAddress  String?  @map("ip_address")
+  userAgent  String?  @map("user_agent")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  // Relations
+  user User? @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([entityType, entityId])
+  @@index([createdAt(sort: Desc)])
+  @@map("audit_log")
+}
+
+// Notification model
+model Notification {
+  id          Int       @id @default(autoincrement())
+  userId      Int       @map("user_id")
+  type        String    // 'rfq_assigned', 'quote_submitted', 'reminder', etc.
+  title       String
+  message     String
+  rfqId       Int?      @map("rfq_id")
+  quoteId     Int?      @map("quote_id")
+  isRead      Boolean   @default(false) @map("is_read")
+  isSentEmail Boolean   @default(false) @map("is_sent_email")
+  emailSentAt DateTime? @map("email_sent_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([isRead])
+  @@index([type])
+  @@map("notifications")
+}
