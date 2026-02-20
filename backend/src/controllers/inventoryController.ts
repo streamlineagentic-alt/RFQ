@@ -105,7 +105,7 @@ export const getInventoryItem = async (req: Request, res: Response): Promise<voi
       return;
     }
 
-    const id = parseInt(req.params.id);
+    const id = parseInt(req.params.id as string);
     if (isNaN(id)) {
       res.status(400).json({ error: { code: 'INVALID_ID', message: 'Invalid inventory item ID' } });
       return;
