@@ -58,6 +58,9 @@ interface RfqDetail {
   isNormalized?: boolean;
   normalizationFlags?: ValidationFlag[];
   normalizedData?: any;
+  originalFilePath?: string;
+  originalFileName?: string;
+  originalFileType?: string;
   buyer: {
     id: number;
     email: string;
@@ -100,6 +103,12 @@ export default function RfqDetailPage() {
   // Supplier matching state
   const [findingSuppliers, setFindingSuppliers] = useState(false);
   const [supplierMatches, setSupplierMatches] = useState<any[] | null>(null);
+
+  // File upload state
+  const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [uploadingFile, setUploadingFile] = useState(false);
+  const [uploadError, setUploadError] = useState('');
+  const [uploadSuccess, setUploadSuccess] = useState('');
 
   // Quote state
   const [quotes, setQuotes] = useState<Quote[]>([]);
@@ -218,6 +227,23 @@ export default function RfqDetailPage() {
       await fetchRfq();
     } catch (err: any) {
       setError(err.message || 'Failed to publish RFQ');
+    }
+  };
+
+  const handleFileUpload = async () => {
+    if (!uploadFile || !token) return;
+    setUploadingFile(true);
+    setUploadError('');
+    setUploadSuccess('');
+    try {
+      await apiClient.uploadRfqFile(rfqId, uploadFile, token);
+      setUploadSuccess(`"${uploadFile.name}" uploaded successfully.`);
+      setUploadFile(null);
+      await fetchRfq();
+    } catch (err: any) {
+      setUploadError(err.message || 'Upload failed');
+    } finally {
+      setUploadingFile(false);
     }
   };
 
@@ -832,6 +858,56 @@ export default function RfqDetailPage() {
                     ))}
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* File Attachment — buyers/admins only */}
+            {user.role !== 'supplier' && (
+              <div className="bg-white rounded-lg shadow p-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Spec Sheet / Attachment</h3>
+
+                {rfq.originalFileName && (
+                  <div className="flex items-center gap-3 mb-4 p-3 bg-gray-50 border border-gray-200 rounded-lg">
+                    <span className="text-2xl">📎</span>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-medium text-gray-900 truncate">{rfq.originalFileName}</div>
+                      <div className="text-xs text-gray-500">{rfq.originalFileType}</div>
+                    </div>
+                    {rfq.originalFilePath && (
+                      <a
+                        href={rfq.originalFilePath}
+                        download={rfq.originalFileName}
+                        className="text-sm text-indigo-600 hover:text-indigo-800 font-medium whitespace-nowrap"
+                      >
+                        Download
+                      </a>
+                    )}
+                  </div>
+                )}
+
+                {uploadError && (
+                  <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded text-sm text-red-700">{uploadError}</div>
+                )}
+                {uploadSuccess && (
+                  <div className="mb-3 p-3 bg-green-50 border border-green-200 rounded text-sm text-green-700">{uploadSuccess}</div>
+                )}
+
+                <div className="flex items-center gap-3">
+                  <input
+                    type="file"
+                    accept=".pdf,.xlsx,.xls,.docx,.doc"
+                    onChange={e => { setUploadFile(e.target.files?.[0] || null); setUploadSuccess(''); setUploadError(''); }}
+                    className="text-sm text-gray-600 file:mr-3 file:py-1.5 file:px-3 file:rounded file:border-0 file:text-sm file:font-medium file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"
+                  />
+                  <button
+                    onClick={handleFileUpload}
+                    disabled={!uploadFile || uploadingFile}
+                    className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition font-medium text-sm disabled:opacity-50 whitespace-nowrap"
+                  >
+                    {uploadingFile ? 'Uploading...' : 'Upload'}
+                  </button>
+                </div>
+                <p className="mt-2 text-xs text-gray-400">Accepted: PDF, Excel, Word — max 5 MB</p>
               </div>
             )}
 

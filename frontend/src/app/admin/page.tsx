@@ -29,7 +29,7 @@ export default function AdminPage() {
   const router = useRouter();
   const { user, token, loading: authLoading } = useAuth();
 
-  const [activeTab, setActiveTab] = useState<'users' | 'categories'>('users');
+  const [activeTab, setActiveTab] = useState<'users' | 'categories' | 'inventory'>('users');
   const [users, setUsers] = useState<User[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loadingData, setLoadingData] = useState(true);
@@ -39,6 +39,11 @@ export default function AdminPage() {
   // Category form
   const [newCat, setNewCat] = useState({ name: '', slug: '', description: '' });
   const [savingCat, setSavingCat] = useState(false);
+
+  // Inventory import
+  const [inventoryFile, setInventoryFile] = useState<File | null>(null);
+  const [importingInventory, setImportingInventory] = useState(false);
+  const [importResult, setImportResult] = useState<{ created: number; skipped: number; total: number; errors: string[] } | null>(null);
 
   useEffect(() => {
     if (!authLoading && (!user || user.role !== 'admin')) {
@@ -108,6 +113,22 @@ export default function AdminPage() {
     }
   };
 
+  const handleInventoryImport = async () => {
+    if (!inventoryFile || !token) return;
+    setImportingInventory(true);
+    setImportResult(null);
+    setError('');
+    try {
+      const res: any = await apiClient.importInventoryCsv(inventoryFile, token);
+      setImportResult(res.data);
+      setInventoryFile(null);
+    } catch (err: any) {
+      setError(err.message || 'Import failed');
+    } finally {
+      setImportingInventory(false);
+    }
+  };
+
   const autoSlug = (name: string) =>
     name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 
@@ -150,7 +171,7 @@ export default function AdminPage() {
 
         {/* Tabs */}
         <div className="flex border-b border-gray-200 mb-6">
-          {(['users', 'categories'] as const).map(tab => (
+          {(['users', 'categories', 'inventory'] as const).map(tab => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -160,13 +181,65 @@ export default function AdminPage() {
                   : 'border-transparent text-gray-500 hover:text-gray-700'
               }`}
             >
-              {tab} {tab === 'users' ? `(${users.length})` : `(${categories.length})`}
+              {tab === 'users' ? `Users (${users.length})` : tab === 'categories' ? `Categories (${categories.length})` : 'Inventory Import'}
             </button>
           ))}
         </div>
 
         {loadingData ? (
           <div className="text-center py-12 text-gray-400">Loading...</div>
+        ) : activeTab === 'inventory' ? (
+          /* Inventory Import */
+          <div className="max-w-2xl mx-auto bg-white rounded-lg shadow p-8">
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">Import Inventory from CSV / Excel</h3>
+            <p className="text-sm text-gray-500 mb-6">
+              Upload a <code>.csv</code> or <code>.xlsx</code> file. Required columns: <strong>sku</strong>, <strong>description</strong>, <strong>qty</strong>.
+              Optional: <em>price, currency, condition, sector, oem, mpn, shipFromCountry, earliestShipDate</em>.
+            </p>
+
+            <div className="flex items-center gap-4 mb-4">
+              <input
+                type="file"
+                accept=".csv,.xlsx,.xls"
+                onChange={e => { setInventoryFile(e.target.files?.[0] || null); setImportResult(null); }}
+                className="text-sm text-gray-600 file:mr-3 file:py-1.5 file:px-3 file:rounded file:border-0 file:text-sm file:font-medium file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"
+              />
+              <button
+                onClick={handleInventoryImport}
+                disabled={!inventoryFile || importingInventory}
+                className="px-5 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-medium text-sm disabled:opacity-50 whitespace-nowrap"
+              >
+                {importingInventory ? 'Importing...' : 'Import'}
+              </button>
+            </div>
+
+            {importResult && (
+              <div className="mt-6 space-y-4">
+                <div className="grid grid-cols-3 gap-4 text-center">
+                  <div className="p-4 bg-green-50 rounded-lg border border-green-200">
+                    <div className="text-2xl font-bold text-green-700">{importResult.created}</div>
+                    <div className="text-sm text-green-600">Upserted</div>
+                  </div>
+                  <div className="p-4 bg-yellow-50 rounded-lg border border-yellow-200">
+                    <div className="text-2xl font-bold text-yellow-700">{importResult.skipped}</div>
+                    <div className="text-sm text-yellow-600">Skipped</div>
+                  </div>
+                  <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+                    <div className="text-2xl font-bold text-gray-700">{importResult.total}</div>
+                    <div className="text-sm text-gray-600">Total Rows</div>
+                  </div>
+                </div>
+                {importResult.errors.length > 0 && (
+                  <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
+                    <div className="text-sm font-semibold text-red-700 mb-2">Errors ({importResult.errors.length}):</div>
+                    <ul className="text-xs text-red-600 space-y-1 list-disc list-inside">
+                      {importResult.errors.map((e, i) => <li key={i}>{e}</li>)}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         ) : activeTab === 'users' ? (
           /* Users Table */
           <div className="bg-white rounded-lg shadow overflow-hidden">

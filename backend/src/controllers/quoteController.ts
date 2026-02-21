@@ -31,8 +31,19 @@ export const getQuotesForRfq = async (req: Request, res: Response): Promise<void
       return;
     }
 
+    // Suppliers only see their own quotes — never competitors' bids
+    const quoteWhere: any = { rfqId };
+    if (req.user.role === 'supplier') {
+      const supplierProfile = await prisma.supplier.findFirst({ where: { userId: req.user.id } });
+      if (!supplierProfile) {
+        res.status(200).json({ data: [] });
+        return;
+      }
+      quoteWhere.supplierId = supplierProfile.id;
+    }
+
     const quotes = await prisma.quote.findMany({
-      where: { rfqId },
+      where: quoteWhere,
       include: {
         supplier: {
           select: {

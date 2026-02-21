@@ -4,6 +4,23 @@ import prisma from '../config/database';
 import { generateRfqNumber } from '../utils/rfqNumberGenerator';
 import { normalizationService } from '../services/normalizationService';
 import { supplierMatchingService } from '../services/supplierMatchingService';
+import multer from 'multer';
+
+export const rfqFileUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    const allowed = [
+      'application/pdf',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'application/vnd.ms-excel',
+      'text/csv',
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+    ];
+    cb(null, allowed.includes(file.mimetype));
+  }
+});
 
 /**
  * Create new RFQ
@@ -130,6 +147,7 @@ export const getRfqs = async (req: Request, res: Response): Promise<void> => {
       status,
       categoryId,
       deliveryCountry,
+      search,
       page = '1',
       limit = '20'
     } = req.query;
@@ -156,6 +174,14 @@ export const getRfqs = async (req: Request, res: Response): Promise<void> => {
 
     if (deliveryCountry) {
       where.deliveryCountry = deliveryCountry;
+    }
+
+    if (search) {
+      where.OR = [
+        { projectName: { contains: search as string, mode: 'insensitive' } },
+        { description: { contains: search as string, mode: 'insensitive' } },
+        { rfqNumber: { contains: search as string, mode: 'insensitive' } },
+      ];
     }
 
     // Get RFQs with pagination
@@ -861,5 +887,61 @@ export const getMatchingSuppliers = async (req: Request, res: Response): Promise
   } catch (error) {
     console.error('Get matching suppliers error:', error);
     res.status(500).json({ error: { code: 'SERVER_ERROR', message: 'Failed to find matching suppliers' } });
+  }
+};
+
+/**
+ * Upload a file attachment to an RFQ
+ * POST /api/v1/rfqs/:id/upload
+ */
+export const uploadRfqFile = async (req: Request, res: Response): Promise<void> => {
+  try {
+    if (!req.user) {
+      res.status(401).json({ error: { code: 'UNAUTHORIZED', message: 'Authentication required' } });
+      return;
+    }
+
+    const rfqId = parseInt(req.params.id as string);
+    if (isNaN(rfqId)) {
+      res.status(400).json({ error: { code: 'INVALID_ID', message: 'Invalid RFQ ID' } });
+      return;
+    }
+
+    const file = (req as any).file as Express.Multer.File | undefined;
+    if (!file) {
+      res.status(400).json({ error: { code: 'NO_FILE', message: 'No file uploaded or file type not allowed (PDF, Excel, Word, CSV only, max 5 MB)' } });
+      return;
+    }
+
+    const rfq = await prisma.rfq.findUnique({ where: { id: rfqId } });
+    if (!rfq) {
+      res.status(404).json({ error: { code: 'RFQ_NOT_FOUND', message: 'RFQ not found' } });
+      return;
+    }
+
+    if (req.user.role === 'buyer' && rfq.buyerId !== req.user.id) {
+      res.status(403).json({ error: { code: 'FORBIDDEN', message: 'Access denied' } });
+      return;
+    }
+
+    // Store file as base64 data URL in the originalFilePath column
+    const dataUrl = `data:${file.mimetype};base64,${file.buffer.toString('base64')}`;
+
+    await prisma.rfq.update({
+      where: { id: rfqId },
+      data: {
+        originalFilePath: dataUrl,
+        originalFileName: file.originalname,
+        originalFileType: file.mimetype
+      }
+    });
+
+    res.status(200).json({
+      message: 'File uploaded successfully',
+      data: { fileName: file.originalname, fileType: file.mimetype, size: file.size }
+    });
+  } catch (error) {
+    console.error('Upload RFQ file error:', error);
+    res.status(500).json({ error: { code: 'SERVER_ERROR', message: 'Failed to upload file' } });
   }
 };

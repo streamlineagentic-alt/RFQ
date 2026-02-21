@@ -33,6 +33,7 @@ export default function RfqListPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [statusFilter, setStatusFilter] = useState(user?.role === 'supplier' ? 'open' : '');
+  const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
@@ -48,7 +49,7 @@ export default function RfqListPage() {
     if (user && token) {
       fetchRfqs();
     }
-  }, [user, token, statusFilter, page]);
+  }, [user, token, statusFilter, search, page]);
 
   const fetchRfqs = async () => {
     try {
@@ -61,6 +62,7 @@ export default function RfqListPage() {
 
       const params: any = { page, limit: LIMIT };
       if (statusFilter) params.status = statusFilter;
+      if (search.trim()) params.search = search.trim();
 
       const response: any = await apiClient.getRfqs(params, token);
       setRfqs(response.data || []);
@@ -139,32 +141,41 @@ export default function RfqListPage() {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Filters */}
         <div className="bg-white rounded-lg shadow p-4 mb-6">
-          <div className="flex items-center gap-4">
-            <label htmlFor="status" className="text-sm font-medium text-gray-700">
-              Filter by Status:
-            </label>
-            <select
-              id="status"
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            >
-              <option value="">All Statuses</option>
-              <option value="draft">Draft</option>
-              <option value="open">Open</option>
-              <option value="closed">Closed</option>
-              <option value="cancelled">Cancelled</option>
-            </select>
-            {statusFilter && (
-              <button
-                onClick={() => { setStatusFilter(''); setPage(1); }}
-                className="text-sm text-indigo-600 hover:text-indigo-800"
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+            <input
+              type="text"
+              value={search}
+              onChange={e => { setSearch(e.target.value); setPage(1); }}
+              placeholder="Search by project name, RFQ number..."
+              className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            />
+            <div className="flex items-center gap-3">
+              <label htmlFor="status" className="text-sm font-medium text-gray-700 whitespace-nowrap">
+                Status:
+              </label>
+              <select
+                id="status"
+                value={statusFilter}
+                onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
+                className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
               >
-                Clear Filter
-              </button>
-            )}
+                <option value="">All</option>
+                <option value="draft">Draft</option>
+                <option value="open">Open</option>
+                <option value="closed">Closed</option>
+                <option value="cancelled">Cancelled</option>
+              </select>
+              {(statusFilter || search) && (
+                <button
+                  onClick={() => { setStatusFilter(''); setSearch(''); setPage(1); }}
+                  className="text-sm text-indigo-600 hover:text-indigo-800 whitespace-nowrap"
+                >
+                  Clear all
+                </button>
+              )}
+            </div>
             {total > 0 && (
-              <span className="ml-auto text-sm text-gray-500">{total} RFQ{total !== 1 ? 's' : ''}</span>
+              <span className="text-sm text-gray-500 whitespace-nowrap">{total} RFQ{total !== 1 ? 's' : ''}</span>
             )}
           </div>
         </div>

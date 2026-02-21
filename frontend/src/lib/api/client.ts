@@ -218,6 +218,32 @@ class ApiClient {
   async saveRecommendation(rfqId: string | number, data: { recommendedQuotes?: any[]; buyerNotes?: string }, token: string) {
     return this.request(`/rfqs/${rfqId}/recommendation`, { method: 'POST', body: data, token });
   }
+
+  async uploadRfqFile(rfqId: string | number, file: File, token: string) {
+    const formData = new FormData();
+    formData.append('file', file);
+    const response = await fetch(`${this.baseURL}/rfqs/${rfqId}/upload`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+      body: formData,
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error?.message || 'Upload failed');
+    return data;
+  }
+
+  async importInventoryCsv(file: File, token: string) {
+    const formData = new FormData();
+    formData.append('file', file);
+    const response = await fetch(`${this.baseURL}/inventory/import`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+      body: formData,
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error?.message || 'Import failed');
+    return data;
+  }
 }
 
 export const apiClient = new ApiClient(API_URL);

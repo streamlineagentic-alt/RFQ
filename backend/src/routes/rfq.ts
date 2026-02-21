@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { body } from 'express-validator';
 import * as rfqController from '../controllers/rfqController';
+import { rfqFileUpload } from '../controllers/rfqController';
 import * as quoteController from '../controllers/quoteController';
 import { authMiddleware, requireRole } from '../middleware/auth';
 
@@ -70,6 +71,7 @@ router.post('/:id/normalize', requireRole('buyer', 'admin'), rfqController.norma
 router.get('/:id/matching-suppliers', requireRole('buyer', 'admin'), rfqController.getMatchingSuppliers);
 router.get('/:id/comparison', requireRole('buyer', 'admin'), rfqController.getQuoteComparison);
 router.post('/:id/recommendation', requireRole('buyer', 'admin'), rfqController.saveRecommendation);
+router.post('/:id/upload', requireRole('buyer', 'admin'), rfqFileUpload.single('file'), rfqController.uploadRfqFile);
 
 // Quote Routes (nested under RFQ)
 router.get('/:id/quotes', quoteController.getQuotesForRfq);

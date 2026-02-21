@@ -24,6 +24,7 @@ export default function SuppliersPage() {
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [search, setSearch] = useState('');
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -65,6 +66,16 @@ export default function SuppliersPage() {
     return '★'.repeat(Math.round(rating)) + '☆'.repeat(5 - Math.round(rating));
   };
 
+  const filtered = suppliers.filter(s => {
+    if (!search.trim()) return true;
+    const q = search.toLowerCase();
+    return (
+      s.companyName.toLowerCase().includes(q) ||
+      (s.contactName || '').toLowerCase().includes(q) ||
+      (s.country || '').toLowerCase().includes(q)
+    );
+  });
+
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white shadow">
@@ -74,7 +85,7 @@ export default function SuppliersPage() {
             <h1 className="text-2xl font-bold text-gray-900">Suppliers</h1>
           </div>
           <div className="text-sm text-gray-600">
-            {suppliers.length} supplier{suppliers.length !== 1 ? 's' : ''} registered
+            {filtered.length} of {suppliers.length} supplier{suppliers.length !== 1 ? 's' : ''}
           </div>
         </div>
       </header>
@@ -86,6 +97,17 @@ export default function SuppliersPage() {
           </div>
         )}
 
+        {/* Search bar */}
+        <div className="bg-white rounded-lg shadow p-4 mb-6">
+          <input
+            type="text"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Search by company name, contact, or country..."
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+          />
+        </div>
+
         {loading ? (
           <div className="text-center py-12">
             <div className="text-xl text-gray-600">Loading suppliers...</div>
@@ -96,9 +118,14 @@ export default function SuppliersPage() {
             <h3 className="text-xl font-semibold text-gray-900 mb-2">No Suppliers Yet</h3>
             <p className="text-gray-600">Suppliers will appear here once they are added to the system.</p>
           </div>
+        ) : filtered.length === 0 ? (
+          <div className="bg-white rounded-lg shadow p-12 text-center">
+            <p className="text-gray-500">No suppliers match "<strong>{search}</strong>"</p>
+            <button onClick={() => setSearch('')} className="mt-3 text-sm text-indigo-600 hover:underline">Clear search</button>
+          </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {suppliers.map(supplier => (
+            {filtered.map(supplier => (
               <div key={supplier.id} className="bg-white rounded-lg shadow p-6 flex flex-col gap-3">
                 <div className="flex justify-between items-start">
                   <h3 className="text-lg font-semibold text-gray-900">{supplier.companyName}</h3>
