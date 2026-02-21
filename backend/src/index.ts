@@ -17,7 +17,7 @@ const PORT = process.env.PORT || 3001;
 const API_VERSION = process.env.API_VERSION || 'v1';
 
 // Middleware
-app.use(helmet()); // Security headers
+app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } })); // Security headers
 const allowedOrigin = process.env.FRONTEND_URL;
 app.use(cors({
   origin: allowedOrigin === '*' || !allowedOrigin ? true : allowedOrigin,
