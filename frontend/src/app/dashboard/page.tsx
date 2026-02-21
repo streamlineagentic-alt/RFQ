@@ -181,7 +181,7 @@ export default function DashboardPage() {
         <div className="bg-white rounded-lg shadow p-6 mb-8">
           <h3 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h3>
           {isSupplier ? (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <Link href="/rfqs" className="flex items-center justify-center gap-2 p-4 border-2 border-indigo-600 text-indigo-600 rounded-lg hover:bg-indigo-50 transition font-medium">
                 <span className="text-xl">📋</span>
                 Browse Open RFQs
@@ -194,6 +194,10 @@ export default function DashboardPage() {
                 <span className="text-xl">🏢</span>
                 Supplier Directory
               </Link>
+              <Link href="/profile" className="flex items-center justify-center gap-2 p-4 border-2 border-teal-500 text-teal-700 rounded-lg hover:bg-teal-50 transition font-medium">
+                <span className="text-xl">👤</span>
+                My Profile
+              </Link>
             </div>
           ) : (
             <div className={`grid grid-cols-1 gap-4 ${isAdmin ? 'md:grid-cols-5' : 'md:grid-cols-4'}`}>
@@ -205,13 +209,13 @@ export default function DashboardPage() {
                 <span className="text-xl">📊</span>
                 View All RFQs
               </Link>
-              <Link href="/inventory" className="flex items-center justify-center gap-2 p-4 border-2 border-amber-500 text-amber-700 rounded-lg hover:bg-amber-50 transition font-medium">
-                <span className="text-xl">🛢️</span>
-                Product Inventory
-              </Link>
               <Link href="/suppliers" className="flex items-center justify-center gap-2 p-4 border-2 border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition font-medium">
                 <span className="text-xl">🤝</span>
                 Manage Suppliers
+              </Link>
+              <Link href="/profile" className="flex items-center justify-center gap-2 p-4 border-2 border-teal-500 text-teal-700 rounded-lg hover:bg-teal-50 transition font-medium">
+                <span className="text-xl">👤</span>
+                My Profile
               </Link>
               {isAdmin && (
                 <Link href="/admin" className="flex items-center justify-center gap-2 p-4 border-2 border-purple-600 text-purple-600 rounded-lg hover:bg-purple-50 transition font-medium">

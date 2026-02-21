@@ -25,6 +25,7 @@ const loginValidation = [
 router.post('/register', registerValidation, authController.register);
 router.post('/login', loginValidation, authController.login);
 router.get('/profile', authMiddleware, authController.getProfile);
+router.patch('/profile', authMiddleware, authController.updateProfile);
 router.get('/users', authMiddleware, authController.getUsers);
 router.patch('/users/:id', authMiddleware, authController.updateUserStatus);
 

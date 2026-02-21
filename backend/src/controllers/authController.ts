@@ -249,6 +249,30 @@ export const updateUserStatus = async (req: Request, res: Response): Promise<voi
   }
 };
 
+export const updateProfile = async (req: Request, res: Response): Promise<void> => {
+  try {
+    if (!req.user) {
+      res.status(401).json({ error: { code: 'UNAUTHORIZED', message: 'Authentication required' } });
+      return;
+    }
+    const { firstName, lastName, phone, companyName } = req.body;
+    const user = await prisma.user.update({
+      where: { id: req.user.id },
+      data: {
+        ...(firstName !== undefined && { firstName }),
+        ...(lastName !== undefined && { lastName }),
+        ...(phone !== undefined && { phone }),
+        ...(companyName !== undefined && { companyName }),
+      },
+      select: { id: true, email: true, role: true, firstName: true, lastName: true, companyName: true, phone: true }
+    });
+    res.status(200).json({ message: 'Profile updated successfully', data: user });
+  } catch (error) {
+    console.error('Update profile error:', error);
+    res.status(500).json({ error: { code: 'SERVER_ERROR', message: 'Failed to update profile' } });
+  }
+};
+
 export const getProfile = async (req: Request, res: Response): Promise<void> => {
   try {
     if (!req.user) {

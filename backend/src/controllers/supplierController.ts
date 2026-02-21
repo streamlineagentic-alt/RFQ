@@ -2,6 +2,57 @@ import { Request, Response } from 'express';
 import { validationResult } from 'express-validator';
 import prisma from '../config/database';
 
+export const getMySupplierProfile = async (req: Request, res: Response): Promise<void> => {
+  try {
+    if (!req.user) { res.status(401).json({ error: { code: 'UNAUTHORIZED', message: 'Authentication required' } }); return; }
+    const supplier = await prisma.supplier.findUnique({
+      where: { userId: req.user.id },
+      include: {
+        user: { select: { id: true, email: true, firstName: true, lastName: true } },
+        categories: { include: { category: true } },
+        _count: { select: { rfqSuppliers: true, quotes: true } }
+      }
+    });
+    if (!supplier) { res.status(404).json({ error: { code: 'SUPPLIER_NOT_FOUND', message: 'Supplier profile not found' } }); return; }
+    res.status(200).json({ data: supplier });
+  } catch (error) {
+    console.error('Get my supplier profile error:', error);
+    res.status(500).json({ error: { code: 'SERVER_ERROR', message: 'Failed to fetch supplier profile' } });
+  }
+};
+
+export const updateMySupplierProfile = async (req: Request, res: Response): Promise<void> => {
+  try {
+    if (!req.user) { res.status(401).json({ error: { code: 'UNAUTHORIZED', message: 'Authentication required' } }); return; }
+    const existing = await prisma.supplier.findUnique({ where: { userId: req.user.id } });
+    if (!existing) { res.status(404).json({ error: { code: 'SUPPLIER_NOT_FOUND', message: 'Supplier profile not found' } }); return; }
+    const { companyName, supplierType, description, website, contactName, contactEmail, contactPhone, country, city, address, regionsServed, canExportToUkraine, certifications } = req.body;
+    const supplier = await prisma.supplier.update({
+      where: { userId: req.user.id },
+      data: {
+        ...(companyName && { companyName }),
+        ...(supplierType !== undefined && { supplierType }),
+        ...(description !== undefined && { description }),
+        ...(website !== undefined && { website }),
+        ...(contactName !== undefined && { contactName }),
+        ...(contactEmail !== undefined && { contactEmail }),
+        ...(contactPhone !== undefined && { contactPhone }),
+        ...(country !== undefined && { country }),
+        ...(city !== undefined && { city }),
+        ...(address !== undefined && { address }),
+        ...(regionsServed !== undefined && { regionsServed }),
+        ...(canExportToUkraine !== undefined && { canExportToUkraine }),
+        ...(certifications !== undefined && { certifications }),
+      },
+      include: { user: { select: { id: true, email: true, firstName: true, lastName: true } }, categories: { include: { category: true } } }
+    });
+    res.status(200).json({ message: 'Supplier profile updated successfully', data: supplier });
+  } catch (error) {
+    console.error('Update my supplier profile error:', error);
+    res.status(500).json({ error: { code: 'SERVER_ERROR', message: 'Failed to update supplier profile' } });
+  }
+};
+
 /**
  * Create new supplier
  * POST /api/v1/suppliers

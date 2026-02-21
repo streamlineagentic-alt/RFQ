@@ -23,6 +23,8 @@ const supplierValidation = [
 ];
 
 // Routes
+router.get('/me', supplierController.getMySupplierProfile);
+router.patch('/me', supplierController.updateMySupplierProfile);
 router.get('/', supplierController.getSuppliers);
 router.post('/', requireRole('admin', 'supplier'), supplierValidation, supplierController.createSupplier);
 router.get('/:id', supplierController.getSupplierById);

@@ -198,6 +198,18 @@ class ApiClient {
       token,
     });
   }
+
+  async updateProfile(data: Record<string, any>, token: string) {
+    return this.request('/auth/profile', { method: 'PATCH', body: data, token });
+  }
+
+  async getMySupplierProfile(token: string) {
+    return this.request('/suppliers/me', { token });
+  }
+
+  async updateMySupplierProfile(data: Record<string, any>, token: string) {
+    return this.request('/suppliers/me', { method: 'PATCH', body: data, token });
+  }
 }
 
 export const apiClient = new ApiClient(API_URL);

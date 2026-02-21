@@ -137,12 +137,15 @@ export default function SuppliersPage() {
                   </div>
                 )}
 
-                <div className="mt-auto pt-3 border-t">
+                <div className="mt-auto pt-3 border-t flex justify-between items-center">
                   <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
                     supplier.isActive ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'
                   }`}>
                     {supplier.isActive ? 'Active' : 'Inactive'}
                   </span>
+                  <Link href={`/suppliers/${supplier.id}`} className="text-sm text-indigo-600 hover:text-indigo-800 font-medium">
+                    View Profile →
+                  </Link>
                 </div>
               </div>
             ))}
