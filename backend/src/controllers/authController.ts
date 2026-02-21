@@ -65,6 +65,19 @@ export const register = async (req: Request, res: Response): Promise<void> => {
       }
     });
 
+    // If registering as supplier, create Supplier profile automatically
+    if ((role || 'buyer') === 'supplier' && companyName) {
+      await prisma.supplier.create({
+        data: {
+          userId: user.id,
+          companyName,
+          contactName: `${firstName || ''} ${lastName || ''}`.trim(),
+          contactEmail: email,
+          contactPhone: phone || null,
+        }
+      });
+    }
+
     // Generate JWT token
     const token = jwt.sign(
       {
