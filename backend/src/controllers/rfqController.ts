@@ -590,6 +590,228 @@ export const normalizeRfq = async (req: Request, res: Response): Promise<void> =
 };
 
 /**
+ * Get quote comparison data for an RFQ
+ * GET /api/v1/rfqs/:id/comparison
+ */
+export const getQuoteComparison = async (req: Request, res: Response): Promise<void> => {
+  try {
+    if (!req.user) {
+      res.status(401).json({ error: { code: 'UNAUTHORIZED', message: 'Authentication required' } });
+      return;
+    }
+
+    const rfqId = parseInt(req.params.id as string);
+    if (isNaN(rfqId)) {
+      res.status(400).json({ error: { code: 'INVALID_ID', message: 'Invalid RFQ ID' } });
+      return;
+    }
+
+    const rfq = await prisma.rfq.findUnique({ where: { id: rfqId } });
+    if (!rfq) {
+      res.status(404).json({ error: { code: 'RFQ_NOT_FOUND', message: 'RFQ not found' } });
+      return;
+    }
+
+    if (req.user.role === 'buyer' && rfq.buyerId !== req.user.id) {
+      res.status(403).json({ error: { code: 'FORBIDDEN', message: 'Access denied' } });
+      return;
+    }
+
+    const quotes = await prisma.quote.findMany({
+      where: { rfqId, status: { not: 'withdrawn' } },
+      include: {
+        supplier: {
+          select: {
+            id: true,
+            companyName: true,
+            country: true,
+            supplierType: true,
+            responsivenessScore: true,
+            certifications: true
+          }
+        }
+      },
+      orderBy: { price: 'asc' }
+    });
+
+    if (quotes.length === 0) {
+      res.status(200).json({ data: { rfqId, rfqNumber: rfq.rfqNumber, quotes: [], recommendations: [], savedRecommendation: null } });
+      return;
+    }
+
+    const activeQuotes = quotes.filter(q => q.status !== 'rejected');
+    const prices = activeQuotes.map(q => Number(q.price));
+    const minPrice = Math.min(...prices);
+    const maxPrice = Math.max(...prices);
+    const leadTimes = activeQuotes.filter(q => q.leadTimeWeeks != null).map(q => q.leadTimeWeeks as number);
+    const minLeadTime = leadTimes.length > 0 ? Math.min(...leadTimes) : null;
+    const maxLeadTime = leadTimes.length > 0 ? Math.max(...leadTimes) : null;
+    const now = new Date();
+    const twoWeeksFromNow = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000);
+
+    const enriched = quotes.map(quote => {
+      const price = Number(quote.price);
+      const isActive = quote.status !== 'rejected';
+
+      const riskFlags: string[] = [];
+      if (!quote.warrantyDescription) riskFlags.push('No warranty specified');
+      if (!quote.paymentTerms) riskFlags.push('No payment terms');
+      if (!quote.incoterm) riskFlags.push('No incoterms');
+      if (quote.validUntil && new Date(quote.validUntil) < twoWeeksFromNow) riskFlags.push('Quote expires soon');
+      if (!quote.leadTimeWeeks) riskFlags.push('No lead time specified');
+
+      // Price score: 1.0 = cheapest, 0.0 = most expensive
+      const priceScore = maxPrice > minPrice ? (maxPrice - price) / (maxPrice - minPrice) : 1;
+
+      // Lead time score: 1.0 = fastest, 0.0 = slowest
+      let leadTimeScore = 0.5;
+      if (quote.leadTimeWeeks != null) {
+        if (maxLeadTime !== null && minLeadTime !== null && maxLeadTime !== minLeadTime) {
+          leadTimeScore = (maxLeadTime - quote.leadTimeWeeks) / (maxLeadTime - minLeadTime);
+        } else {
+          leadTimeScore = 1;
+        }
+      }
+
+      const responsivenessScore = (quote.supplier.responsivenessScore || 3) / 5;
+      const compositeScore = Math.round((priceScore * 0.4 + leadTimeScore * 0.4 + responsivenessScore * 0.2) * 100);
+
+      return {
+        id: quote.id,
+        rfqId: quote.rfqId,
+        supplierId: quote.supplierId,
+        price,
+        currency: quote.currency,
+        leadTimeWeeks: quote.leadTimeWeeks,
+        incoterm: quote.incoterm,
+        paymentTerms: quote.paymentTerms,
+        warrantyDescription: quote.warrantyDescription,
+        validUntil: quote.validUntil,
+        notes: quote.notes,
+        status: quote.status,
+        submittedAt: quote.submittedAt,
+        supplier: quote.supplier,
+        isBestPrice: isActive && price === minPrice,
+        isFastestDelivery: isActive && quote.leadTimeWeeks === minLeadTime && minLeadTime !== null,
+        riskFlags,
+        compositeScore,
+        priceScore: Math.round(priceScore * 100),
+        leadTimeScore: Math.round(leadTimeScore * 100),
+        isBalanced: false
+      };
+    });
+
+    // Mark balanced winner
+    const maxComposite = Math.max(...enriched.filter(q => q.status !== 'rejected').map(q => q.compositeScore));
+    enriched.forEach(q => {
+      q.isBalanced = q.status !== 'rejected' && q.compositeScore === maxComposite;
+    });
+
+    // Generate recommendations (top 3 active quotes by composite score)
+    const sortedActive = [...enriched]
+      .filter(q => q.status !== 'rejected')
+      .sort((a, b) => b.compositeScore - a.compositeScore);
+
+    const recommendations = sortedActive.slice(0, 3).map((q, i) => {
+      const reasons: string[] = [];
+      if (q.isBestPrice) reasons.push('Lowest price');
+      if (q.isFastestDelivery) reasons.push('Fastest delivery');
+      if (q.isBalanced) reasons.push('Best overall balance of price & speed');
+      if ((q.supplier.responsivenessScore || 0) >= 4) reasons.push('Highly responsive supplier');
+      if (q.riskFlags.length === 0) reasons.push('Complete quote — no missing fields');
+      if (reasons.length === 0) reasons.push(`Ranked #${i + 1} by composite score`);
+      return {
+        rank: i + 1,
+        quoteId: q.id,
+        supplierId: q.supplierId,
+        supplierName: q.supplier.companyName,
+        country: q.supplier.country,
+        price: q.price,
+        currency: q.currency,
+        leadTimeWeeks: q.leadTimeWeeks,
+        compositeScore: q.compositeScore,
+        reasons,
+        riskCount: q.riskFlags.length
+      };
+    });
+
+    const savedRecommendation = await prisma.recommendation.findFirst({
+      where: { rfqId },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    res.status(200).json({
+      data: { rfqId, rfqNumber: rfq.rfqNumber, quotes: enriched, recommendations, savedRecommendation }
+    });
+  } catch (error) {
+    console.error('Get quote comparison error:', error);
+    res.status(500).json({ error: { code: 'SERVER_ERROR', message: 'Failed to get quote comparison' } });
+  }
+};
+
+/**
+ * Save procurement recommendation
+ * POST /api/v1/rfqs/:id/recommendation
+ */
+export const saveRecommendation = async (req: Request, res: Response): Promise<void> => {
+  try {
+    if (!req.user) {
+      res.status(401).json({ error: { code: 'UNAUTHORIZED', message: 'Authentication required' } });
+      return;
+    }
+
+    const rfqId = parseInt(req.params.id as string);
+    if (isNaN(rfqId)) {
+      res.status(400).json({ error: { code: 'INVALID_ID', message: 'Invalid RFQ ID' } });
+      return;
+    }
+
+    const rfq = await prisma.rfq.findUnique({ where: { id: rfqId } });
+    if (!rfq) {
+      res.status(404).json({ error: { code: 'RFQ_NOT_FOUND', message: 'RFQ not found' } });
+      return;
+    }
+
+    if (req.user.role === 'buyer' && rfq.buyerId !== req.user.id) {
+      res.status(403).json({ error: { code: 'FORBIDDEN', message: 'Access denied' } });
+      return;
+    }
+
+    const { recommendedQuotes, buyerNotes } = req.body;
+
+    const existing = await prisma.recommendation.findFirst({ where: { rfqId }, orderBy: { createdAt: 'desc' } });
+
+    let recommendation;
+    if (existing) {
+      recommendation = await prisma.recommendation.update({
+        where: { id: existing.id },
+        data: {
+          recommendedQuotes: recommendedQuotes || existing.recommendedQuotes,
+          buyerNotes: buyerNotes !== undefined ? buyerNotes : existing.buyerNotes,
+          isReviewed: true,
+          reviewedAt: new Date()
+        }
+      });
+    } else {
+      recommendation = await prisma.recommendation.create({
+        data: {
+          rfqId,
+          recommendedQuotes: recommendedQuotes || [],
+          buyerNotes: buyerNotes || null,
+          isReviewed: true,
+          reviewedAt: new Date()
+        }
+      });
+    }
+
+    res.status(200).json({ message: 'Recommendation saved', data: recommendation });
+  } catch (error) {
+    console.error('Save recommendation error:', error);
+    res.status(500).json({ error: { code: 'SERVER_ERROR', message: 'Failed to save recommendation' } });
+  }
+};
+
+/**
  * Get matching suppliers for an RFQ
  * GET /api/v1/rfqs/:id/matching-suppliers
  */

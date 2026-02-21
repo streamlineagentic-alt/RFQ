@@ -68,6 +68,8 @@ router.patch('/:id', requireRole('buyer', 'admin'), updateRfqValidation, rfqCont
 router.post('/:id/publish', requireRole('buyer', 'admin'), rfqController.publishRfq);
 router.post('/:id/normalize', requireRole('buyer', 'admin'), rfqController.normalizeRfq);
 router.get('/:id/matching-suppliers', requireRole('buyer', 'admin'), rfqController.getMatchingSuppliers);
+router.get('/:id/comparison', requireRole('buyer', 'admin'), rfqController.getQuoteComparison);
+router.post('/:id/recommendation', requireRole('buyer', 'admin'), rfqController.saveRecommendation);
 
 // Quote Routes (nested under RFQ)
 router.get('/:id/quotes', quoteController.getQuotesForRfq);

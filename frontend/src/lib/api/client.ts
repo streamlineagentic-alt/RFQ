@@ -210,6 +210,14 @@ class ApiClient {
   async updateMySupplierProfile(data: Record<string, any>, token: string) {
     return this.request('/suppliers/me', { method: 'PATCH', body: data, token });
   }
+
+  async getQuoteComparison(rfqId: string | number, token: string) {
+    return this.request(`/rfqs/${rfqId}/comparison`, { token });
+  }
+
+  async saveRecommendation(rfqId: string | number, data: { recommendedQuotes?: any[]; buyerNotes?: string }, token: string) {
+    return this.request(`/rfqs/${rfqId}/recommendation`, { method: 'POST', body: data, token });
+  }
 }
 
 export const apiClient = new ApiClient(API_URL);

@@ -409,22 +409,32 @@ export default function RfqDetailPage() {
                     </p>
                   )}
                 </div>
-                {user.role === 'supplier' && rfq.status === 'open' && (
-                  <button
-                    onClick={() => {
-                      if (!showQuoteForm) {
-                        setQuoteForm(prev => ({
-                          ...prev,
-                          supplierName: prev.supplierName || user.companyName || '',
-                        }));
-                      }
-                      setShowQuoteForm(!showQuoteForm);
-                    }}
-                    className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition font-medium"
-                  >
-                    {showQuoteForm ? 'Cancel' : '+ Submit Quote'}
-                  </button>
-                )}
+                <div className="flex gap-2 items-center">
+                  {user.role !== 'supplier' && quotes.length >= 2 && (
+                    <Link
+                      href={`/rfqs/${rfqId}/comparison`}
+                      className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition font-medium text-sm"
+                    >
+                      Compare Quotes
+                    </Link>
+                  )}
+                  {user.role === 'supplier' && rfq.status === 'open' && (
+                    <button
+                      onClick={() => {
+                        if (!showQuoteForm) {
+                          setQuoteForm(prev => ({
+                            ...prev,
+                            supplierName: prev.supplierName || user.companyName || '',
+                          }));
+                        }
+                        setShowQuoteForm(!showQuoteForm);
+                      }}
+                      className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition font-medium"
+                    >
+                      {showQuoteForm ? 'Cancel' : '+ Submit Quote'}
+                    </button>
+                  )}
+                </div>
               </div>
 
               {/* Quote submission form */}
