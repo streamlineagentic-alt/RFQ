@@ -182,43 +182,14 @@ async function main() {
     update: {}, create: { rfqId: rfq1.id, supplierId: sup3.id, status: 'submitted', matchScore: 78 },
   });
 
-  // Quotes for rfq1
+  // Quotes for rfq1 — delete existing then recreate
   const validDate1 = new Date('2025-12-31');
-  const q1a = await prisma.quote.upsert({
-    where: { id: 1 }, update: {},
-    create: {
-      rfqSupplierId: rs1a.id, rfqId: rfq1.id, supplierId: sup1.id,
-      price: 284500, currency: 'USD', leadTimeWeeks: 14,
-      incoterm: 'DDP', paymentTerms: 'Net 30', validUntil: validDate1,
-      warrantyMonths: 24, warrantyDescription: '24 months from commissioning',
-      notes: 'API 6A PSL-3 certified. Full MTRs and third-party inspection by Bureau Veritas included. In-house H2S testing capability.',
-      status: 'awarded',
-    },
-  });
-
-  const q1b = await prisma.quote.upsert({
-    where: { id: 2 }, update: {},
-    create: {
-      rfqSupplierId: rs1b.id, rfqId: rfq1.id, supplierId: sup4.id,
-      price: 312000, currency: 'USD', leadTimeWeeks: 18,
-      incoterm: 'CIF', paymentTerms: 'Net 45', validUntil: validDate1,
-      warrantyMonths: 12, warrantyDescription: '12 months from delivery',
-      notes: 'Lead time subject to mill availability. Inspection by SGS possible at additional cost.',
-      status: 'rejected',
-    },
-  });
-
-  const q1c = await prisma.quote.upsert({
-    where: { id: 3 }, update: {},
-    create: {
-      rfqSupplierId: rs1c.id, rfqId: rfq1.id, supplierId: sup3.id,
-      price: 296800, currency: 'USD', leadTimeWeeks: 16,
-      incoterm: 'DAP', paymentTerms: 'Net 30', validUntil: validDate1,
-      warrantyMonths: 18, warrantyDescription: '18 months from delivery',
-      notes: 'DNV GL certified facility. Can accommodate DNV witness inspection.',
-      status: 'rejected',
-    },
-  });
+  await prisma.quote.deleteMany({ where: { rfqId: rfq1.id } });
+  await prisma.quote.createMany({ data: [
+    { rfqSupplierId: rs1a.id, rfqId: rfq1.id, supplierId: sup1.id, price: 284500, currency: 'USD', leadTimeWeeks: 14, incoterm: 'DDP', paymentTerms: 'Net 30', validUntil: validDate1, warrantyMonths: 24, warrantyDescription: '24 months from commissioning', notes: 'API 6A PSL-3 certified. Full MTRs and third-party inspection by Bureau Veritas included. In-house H2S testing capability.', status: 'awarded' },
+    { rfqSupplierId: rs1b.id, rfqId: rfq1.id, supplierId: sup4.id, price: 312000, currency: 'USD', leadTimeWeeks: 18, incoterm: 'CIF', paymentTerms: 'Net 45', validUntil: validDate1, warrantyMonths: 12, warrantyDescription: '12 months from delivery', notes: 'Lead time subject to mill availability. Inspection by SGS possible at additional cost.', status: 'rejected' },
+    { rfqSupplierId: rs1c.id, rfqId: rfq1.id, supplierId: sup3.id, price: 296800, currency: 'USD', leadTimeWeeks: 16, incoterm: 'DAP', paymentTerms: 'Net 30', validUntil: validDate1, warrantyMonths: 18, warrantyDescription: '18 months from delivery', notes: 'DNV GL certified facility. Can accommodate DNV witness inspection.', status: 'rejected' },
+  ]});
 
   console.log(`  ✓ RFQ-2025-0041 (awarded) — 3 quotes`);
 
@@ -252,29 +223,11 @@ async function main() {
   });
 
   const validDate2 = new Date('2026-05-31');
-  await prisma.quote.upsert({
-    where: { id: 4 }, update: {},
-    create: {
-      rfqSupplierId: rs2a.id, rfqId: rfq2.id, supplierId: sup1.id,
-      price: 47600, currency: 'USD', leadTimeWeeks: 8,
-      incoterm: 'DDP', paymentTerms: 'Net 30', validUntil: validDate2,
-      warrantyMonths: 24, warrantyDescription: '24 months from delivery',
-      notes: 'Full compliance with API 600 and NACE MR0175. PMI test reports and hydrostatic test certificates included. Can deliver within 8 weeks ex-stock for 15 units; 4 weeks additional for balance.',
-      status: 'submitted',
-    },
-  });
-
-  await prisma.quote.upsert({
-    where: { id: 5 }, update: {},
-    create: {
-      rfqSupplierId: rs2b.id, rfqId: rfq2.id, supplierId: sup4.id,
-      price: 51200, currency: 'USD', leadTimeWeeks: 10,
-      incoterm: 'CIF', paymentTerms: 'Net 45', validUntil: validDate2,
-      warrantyMonths: 12, warrantyDescription: '12 months from delivery',
-      notes: 'Sourced from approved European mill. Full documentation package available.',
-      status: 'submitted',
-    },
-  });
+  await prisma.quote.deleteMany({ where: { rfqId: rfq2.id } });
+  await prisma.quote.createMany({ data: [
+    { rfqSupplierId: rs2a.id, rfqId: rfq2.id, supplierId: sup1.id, price: 47600, currency: 'USD', leadTimeWeeks: 8, incoterm: 'DDP', paymentTerms: 'Net 30', validUntil: validDate2, warrantyMonths: 24, warrantyDescription: '24 months from delivery', notes: 'Full compliance with API 600 and NACE MR0175. PMI test reports and hydrostatic test certificates included. Can deliver within 8 weeks ex-stock for 15 units; 4 weeks additional for balance.', status: 'submitted' },
+    { rfqSupplierId: rs2b.id, rfqId: rfq2.id, supplierId: sup4.id, price: 51200, currency: 'USD', leadTimeWeeks: 10, incoterm: 'CIF', paymentTerms: 'Net 45', validUntil: validDate2, warrantyMonths: 12, warrantyDescription: '12 months from delivery', notes: 'Sourced from approved European mill. Full documentation package available.', status: 'submitted' },
+  ]});
 
   console.log(`  ✓ RFQ-2025-0057 (open) — 2 quotes`);
 
@@ -302,17 +255,15 @@ async function main() {
     update: {}, create: { rfqId: rfq3.id, supplierId: sup2.id, status: 'submitted', matchScore: 86 },
   });
 
-  await prisma.quote.upsert({
-    where: { id: 6 }, update: {},
-    create: {
-      rfqSupplierId: rs3a.id, rfqId: rfq3.id, supplierId: sup2.id,
-      price: 1850000, currency: 'USD', leadTimeWeeks: 16,
-      incoterm: 'DAP', paymentTerms: '30% advance, 70% on delivery', validUntil: new Date('2026-06-30'),
-      warrantyMonths: 24, warrantyDescription: '24 months from commissioning, parts and labour',
-      notes: 'Proposed model: National Oilwell Varco 14-P-220. In stock at Houston warehouse. ATEX Zone 1 certification. Full factory acceptance test (FAT) at our facility with customer witness.',
-      status: 'submitted',
-    },
-  });
+  await prisma.quote.deleteMany({ where: { rfqId: rfq3.id } });
+  await prisma.quote.create({ data: {
+    rfqSupplierId: rs3a.id, rfqId: rfq3.id, supplierId: sup2.id,
+    price: 1850000, currency: 'USD', leadTimeWeeks: 16,
+    incoterm: 'DAP', paymentTerms: '30% advance, 70% on delivery', validUntil: new Date('2026-06-30'),
+    warrantyMonths: 24, warrantyDescription: '24 months from commissioning, parts and labour',
+    notes: 'Proposed model: National Oilwell Varco 14-P-220. In stock at Houston warehouse. ATEX Zone 1 certification. Full factory acceptance test (FAT) at our facility with customer witness.',
+    status: 'submitted',
+  }});
 
   console.log(`  ✓ RFQ-2026-0003 (open) — 1 quote`);
 
